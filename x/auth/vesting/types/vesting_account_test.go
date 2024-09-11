@@ -4,12 +4,15 @@ import (
 	"testing"
 	"time"
 
+	"github.com/golang/mock/gomock"
 	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
 
 	"cosmossdk.io/core/header"
+	coretesting "cosmossdk.io/core/testing"
 	storetypes "cosmossdk.io/store/types"
 
+	codectestutil "github.com/cosmos/cosmos-sdk/codec/testutil"
 	"github.com/cosmos/cosmos-sdk/crypto/keys/secp256k1"
 	"github.com/cosmos/cosmos-sdk/runtime"
 	"github.com/cosmos/cosmos-sdk/testutil"
@@ -20,6 +23,7 @@ import (
 	"github.com/cosmos/cosmos-sdk/x/auth/keeper"
 	authtypes "github.com/cosmos/cosmos-sdk/x/auth/types"
 	"github.com/cosmos/cosmos-sdk/x/auth/vesting"
+	vestingtestutil "github.com/cosmos/cosmos-sdk/x/auth/vesting/testutil"
 	"github.com/cosmos/cosmos-sdk/x/auth/vesting/types"
 )
 
@@ -37,12 +41,16 @@ type VestingAccountTestSuite struct {
 }
 
 func (s *VestingAccountTestSuite) SetupTest() {
-	encCfg := moduletestutil.MakeTestEncodingConfig(vesting.AppModuleBasic{})
+	encCfg := moduletestutil.MakeTestEncodingConfig(codectestutil.CodecOptions{}, vesting.AppModule{})
 
 	key := storetypes.NewKVStoreKey(authtypes.StoreKey)
-	storeService := runtime.NewKVStoreService(key)
+	env := runtime.NewEnvironment(runtime.NewKVStoreService(key), coretesting.NewNopLogger())
 	testCtx := testutil.DefaultContextWithDB(s.T(), key, storetypes.NewTransientStoreKey("transient_test"))
 	s.ctx = testCtx.Ctx.WithHeaderInfo(header.Info{})
+
+	// gomock initializations
+	ctrl := gomock.NewController(&testing.T{})
+	acctsModKeeper := vestingtestutil.NewMockAccountsModKeeper(ctrl)
 
 	maccPerms := map[string][]string{
 		"fee_collector":          nil,
@@ -54,9 +62,10 @@ func (s *VestingAccountTestSuite) SetupTest() {
 	}
 
 	s.accountKeeper = keeper.NewAccountKeeper(
+		env,
 		encCfg.Codec,
-		storeService,
 		authtypes.ProtoBaseAccount,
+		acctsModKeeper,
 		maccPerms,
 		authcodec.NewBech32Codec("cosmos"),
 		"cosmos",

@@ -7,8 +7,6 @@ import (
 	"path/filepath"
 	"testing"
 
-	abci "github.com/cometbft/cometbft/abci/types"
-	rpcclientmock "github.com/cometbft/cometbft/rpc/client/mock"
 	"github.com/stretchr/testify/suite"
 
 	sdkmath "cosmossdk.io/math"
@@ -17,7 +15,7 @@ import (
 
 	"github.com/cosmos/cosmos-sdk/client"
 	"github.com/cosmos/cosmos-sdk/client/flags"
-	"github.com/cosmos/cosmos-sdk/codec/address"
+	codectestutil "github.com/cosmos/cosmos-sdk/codec/testutil"
 	"github.com/cosmos/cosmos-sdk/crypto/keyring"
 	svrcmd "github.com/cosmos/cosmos-sdk/server/cmd"
 	clitestutil "github.com/cosmos/cosmos-sdk/testutil/cli"
@@ -42,22 +40,20 @@ func TestCLITestSuite(t *testing.T) {
 }
 
 func (s *CLITestSuite) SetupSuite() {
-	s.encCfg = testutilmod.MakeTestEncodingConfig(genutil.AppModuleBasic{})
+	s.encCfg = testutilmod.MakeTestEncodingConfig(codectestutil.CodecOptions{}, genutil.AppModule{})
 	s.kr = keyring.NewInMemory(s.encCfg.Codec)
 	s.baseCtx = client.Context{}.
 		WithKeyring(s.kr).
 		WithTxConfig(s.encCfg.TxConfig).
 		WithCodec(s.encCfg.Codec).
-		WithClient(clitestutil.MockCometRPC{Client: rpcclientmock.Client{}}).
+		WithClient(clitestutil.MockCometRPC{}).
 		WithAccountRetriever(client.MockAccountRetriever{}).
 		WithOutput(io.Discard).
 		WithChainID("test-chain")
 
 	ctxGen := func() client.Context {
 		bz, _ := s.encCfg.Codec.Marshal(&sdk.TxResponse{})
-		c := clitestutil.NewMockCometRPC(abci.ResponseQuery{
-			Value: bz,
-		})
+		c := clitestutil.NewMockCometRPCWithResponseQueryValue(bz)
 		return s.baseCtx.WithClient(c)
 	}
 	s.clientCtx = ctxGen()
@@ -123,7 +119,7 @@ func (s *CLITestSuite) TestGenTxCmd() {
 			clientCtx := s.clientCtx
 			ctx := svrcmd.CreateExecuteContext(context.Background())
 
-			cmd := cli.GenTxCmd(module.NewBasicManager(), clientCtx.TxConfig, banktypes.GenesisBalancesIterator{}, address.NewBech32Codec("cosmosvaloper"))
+			cmd := cli.GenTxCmd(module.NewManager(), banktypes.GenesisBalancesIterator{})
 			cmd.SetContext(ctx)
 			cmd.SetArgs(tc.args)
 

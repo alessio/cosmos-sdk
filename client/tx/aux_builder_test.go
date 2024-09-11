@@ -7,19 +7,35 @@ import (
 
 	"github.com/cosmos/cosmos-sdk/client/tx"
 	"github.com/cosmos/cosmos-sdk/codec"
+	"github.com/cosmos/cosmos-sdk/codec/testutil"
 	codectypes "github.com/cosmos/cosmos-sdk/codec/types"
 	cryptotypes "github.com/cosmos/cosmos-sdk/crypto/types"
 	"github.com/cosmos/cosmos-sdk/testutil/testdata"
+	"github.com/cosmos/cosmos-sdk/testutil/x/counter"
+	countertypes "github.com/cosmos/cosmos-sdk/testutil/x/counter/types"
 	sdk "github.com/cosmos/cosmos-sdk/types"
 	moduletestutil "github.com/cosmos/cosmos-sdk/types/module/testutil"
 	typestx "github.com/cosmos/cosmos-sdk/types/tx"
 	"github.com/cosmos/cosmos-sdk/types/tx/signing"
-	"github.com/cosmos/cosmos-sdk/x/counter"
+)
+
+const (
+	memo          = "waboom"
+	timeoutHeight = uint64(5)
+)
+
+var (
+	_, pub1, addr1 = testdata.KeyTestPubAddr()
+	addr1Str, _    = testutil.CodecOptions{}.GetAddressCodec().BytesToString(addr1)
+	rawSig         = []byte("dummy")
+	msg1           = &countertypes.MsgIncreaseCounter{Signer: addr1Str, Count: 1}
+
+	chainID = "test-chain"
 )
 
 func TestAuxTxBuilder(t *testing.T) {
-	counterModule := counter.AppModuleBasic{}
-	cdc := moduletestutil.MakeTestEncodingConfig(counterModule).Codec
+	counterModule := counter.AppModule{}
+	cdc := moduletestutil.MakeTestEncodingConfig(testutil.CodecOptions{}, counterModule).Codec
 	reg := codectypes.NewInterfaceRegistry()
 
 	testdata.RegisterInterfaces(reg)
@@ -116,7 +132,7 @@ func TestAuxTxBuilder(t *testing.T) {
 			func() error {
 				require.NoError(t, b.SetMsgs(msg1))
 				require.NoError(t, b.SetPubKey(pub1))
-				b.SetAddress(addr1.String())
+				b.SetAddress(addr1Str)
 				require.NoError(t, b.SetSignMode(signing.SignMode_SIGN_MODE_DIRECT_AUX))
 
 				_, err := b.GetSignBytes()
@@ -137,7 +153,7 @@ func TestAuxTxBuilder(t *testing.T) {
 				b.SetChainID(chainID)
 				require.NoError(t, b.SetMsgs(msg1))
 				require.NoError(t, b.SetPubKey(pub1))
-				b.SetAddress(addr1.String())
+				b.SetAddress(addr1Str)
 				err := b.SetSignMode(signing.SignMode_SIGN_MODE_DIRECT_AUX)
 				require.NoError(t, err)
 
@@ -159,7 +175,7 @@ func TestAuxTxBuilder(t *testing.T) {
 			func() error {
 				require.NoError(t, b.SetMsgs(msg1))
 				require.NoError(t, b.SetPubKey(pub1))
-				b.SetAddress(addr1.String())
+				b.SetAddress(addr1Str)
 				err := b.SetSignMode(signing.SignMode_SIGN_MODE_LEGACY_AMINO_JSON)
 				require.NoError(t, err)
 
@@ -178,7 +194,7 @@ func TestAuxTxBuilder(t *testing.T) {
 				b.SetChainID(chainID)
 				require.NoError(t, b.SetMsgs(msg1))
 				require.NoError(t, b.SetPubKey(pub1))
-				b.SetAddress(addr1.String())
+				b.SetAddress(addr1Str)
 				err := b.SetSignMode(signing.SignMode_SIGN_MODE_LEGACY_AMINO_JSON)
 				require.NoError(t, err)
 

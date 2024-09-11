@@ -3,15 +3,19 @@ package simapp
 import (
 	"context"
 
-	storetypes "cosmossdk.io/store/types"
+	"cosmossdk.io/core/appmodule"
+	corestore "cosmossdk.io/core/store"
+	"cosmossdk.io/x/accounts"
+	bankv2types "cosmossdk.io/x/bank/v2/types"
+	epochstypes "cosmossdk.io/x/epochs/types"
 	protocolpooltypes "cosmossdk.io/x/protocolpool/types"
 	upgradetypes "cosmossdk.io/x/upgrade/types"
 
-	"github.com/cosmos/cosmos-sdk/types/module"
+	authkeeper "github.com/cosmos/cosmos-sdk/x/auth/keeper"
 )
 
 // UpgradeName defines the on-chain upgrade name for the sample SimApp upgrade
-// from v047 to v050.
+// from v0.50.x to v0.51.x
 //
 // NOTE: This upgrade defines a reference implementation of what an upgrade
 // could look like when an application is migrating from Cosmos SDK version
@@ -21,7 +25,13 @@ const UpgradeName = "v050-to-v051"
 func (app SimApp) RegisterUpgradeHandlers() {
 	app.UpgradeKeeper.SetUpgradeHandler(
 		UpgradeName,
-		func(ctx context.Context, _ upgradetypes.Plan, fromVM module.VersionMap) (module.VersionMap, error) {
+		func(ctx context.Context, _ upgradetypes.Plan, fromVM appmodule.VersionMap) (appmodule.VersionMap, error) {
+			// sync accounts and auth module account number
+			err := authkeeper.MigrateAccountNumberUnsafe(ctx, &app.AuthKeeper)
+			if err != nil {
+				return nil, err
+			}
+
 			return app.ModuleManager.RunMigrations(ctx, app.Configurator(), fromVM)
 		},
 	)
@@ -32,10 +42,14 @@ func (app SimApp) RegisterUpgradeHandlers() {
 	}
 
 	if upgradeInfo.Name == UpgradeName && !app.UpgradeKeeper.IsSkipHeight(upgradeInfo.Height) {
-		storeUpgrades := storetypes.StoreUpgrades{
+		storeUpgrades := corestore.StoreUpgrades{
 			Added: []string{
-				protocolpooltypes.ModuleName,
+				accounts.StoreKey,
+				protocolpooltypes.StoreKey,
+				epochstypes.StoreKey,
+				bankv2types.ModuleName,
 			},
+			Deleted: []string{"crisis"}, // The SDK discontinued the crisis module in v0.52.0
 		}
 
 		// configure store loader that checks if version == upgradeHeight and applies store upgrades

@@ -7,6 +7,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	clienttx "github.com/cosmos/cosmos-sdk/client/tx"
+	codectestutil "github.com/cosmos/cosmos-sdk/codec/testutil"
 	codectypes "github.com/cosmos/cosmos-sdk/codec/types"
 	"github.com/cosmos/cosmos-sdk/testutil/testdata"
 	_ "github.com/cosmos/cosmos-sdk/testutil/testdata/testpb"
@@ -37,7 +38,8 @@ var (
 // Then it tests integrating the 2 AuxSignerData into a
 // client.TxBuilder created by the fee payer.
 func TestBuilderWithAux(t *testing.T) {
-	encodingConfig := moduletestutil.MakeTestEncodingConfig()
+	t.Skip("restore when we re-enable aux on the TX builder")
+	encodingConfig := moduletestutil.MakeTestEncodingConfig(codectestutil.CodecOptions{})
 	interfaceRegistry := encodingConfig.InterfaceRegistry
 	txConfig := encodingConfig.TxConfig
 

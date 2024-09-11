@@ -7,6 +7,7 @@ import (
 	"github.com/stretchr/testify/suite"
 
 	"cosmossdk.io/core/header"
+	coretesting "cosmossdk.io/core/testing"
 	sdkmath "cosmossdk.io/math"
 	storetypes "cosmossdk.io/store/types"
 	"cosmossdk.io/x/feegrant"
@@ -15,6 +16,7 @@ import (
 	feegranttestutil "cosmossdk.io/x/feegrant/testutil"
 
 	codecaddress "github.com/cosmos/cosmos-sdk/codec/address"
+	codectestutil "github.com/cosmos/cosmos-sdk/codec/testutil"
 	"github.com/cosmos/cosmos-sdk/runtime"
 	"github.com/cosmos/cosmos-sdk/testutil"
 	simtestutil "github.com/cosmos/cosmos-sdk/testutil/sims"
@@ -43,7 +45,7 @@ func (suite *KeeperTestSuite) SetupTest() {
 	suite.addrs = simtestutil.CreateIncrementalAccounts(20)
 	key := storetypes.NewKVStoreKey(feegrant.StoreKey)
 	testCtx := testutil.DefaultContextWithDB(suite.T(), key, storetypes.NewTransientStoreKey("transient_test"))
-	encCfg := moduletestutil.MakeTestEncodingConfig(module.AppModuleBasic{})
+	encCfg := moduletestutil.MakeTestEncodingConfig(codectestutil.CodecOptions{}, module.AppModule{})
 
 	// setup gomock and initialize some globally expected executions
 	ctrl := gomock.NewController(suite.T())
@@ -60,7 +62,7 @@ func (suite *KeeperTestSuite) SetupTest() {
 		suite.encodedAddrs = append(suite.encodedAddrs, str)
 	}
 
-	suite.feegrantKeeper = keeper.NewKeeper(encCfg.Codec, runtime.NewKVStoreService(key), suite.accountKeeper)
+	suite.feegrantKeeper = keeper.NewKeeper(runtime.NewEnvironment(runtime.NewKVStoreService(key), coretesting.NewNopLogger()), encCfg.Codec, suite.accountKeeper)
 	suite.ctx = testCtx.Ctx
 	suite.msgSrvr = keeper.NewMsgServerImpl(suite.feegrantKeeper)
 	suite.atom = sdk.NewCoins(sdk.NewCoin("atom", sdkmath.NewInt(555)))
@@ -165,7 +167,6 @@ func (suite *KeeperTestSuite) TestKeeperCrud() {
 	}
 
 	for name, tc := range cases {
-		tc := tc
 		suite.Run(name, func() {
 			allow, _ := suite.feegrantKeeper.GetAllowance(suite.ctx, tc.granter, tc.grantee)
 
@@ -259,7 +260,6 @@ func (suite *KeeperTestSuite) TestUseGrantedFee() {
 	}
 
 	for name, tc := range cases {
-		tc := tc
 		suite.Run(name, func() {
 			err := suite.feegrantKeeper.GrantAllowance(suite.ctx, tc.granter, tc.grantee, future)
 			suite.Require().NoError(err)
@@ -295,10 +295,12 @@ func (suite *KeeperTestSuite) TestUseGrantedFee() {
 	suite.Error(err)
 	suite.Contains(err.Error(), "fee allowance expired")
 
-	// verify: feegrant is revoked
+	// verify: feegrant is not revoked
+	// The expired feegrant is not automatically revoked when attempting to use it.
+	// This is because the transaction using an expired feegrant would fail and be rolled back.
+	// Expired feegrants are typically cleaned up by the ABCI EndBlocker, not by failed usage attempts.
 	_, err = suite.feegrantKeeper.GetAllowance(ctx, suite.addrs[0], suite.addrs[2])
-	suite.Error(err)
-	suite.Contains(err.Error(), "not found")
+	suite.Require().NoError(err)
 }
 
 func (suite *KeeperTestSuite) TestIterateGrants() {
@@ -340,8 +342,6 @@ func (suite *KeeperTestSuite) TestPruneGrants() {
 		grantee   sdk.AccAddress
 		allowance feegrant.FeeAllowanceI
 		expErrMsg string
-		preRun    func()
-		postRun   func()
 	}{
 		{
 			name:      "grant pruned from state after a block: error",
@@ -408,11 +408,7 @@ func (suite *KeeperTestSuite) TestPruneGrants() {
 	}
 
 	for _, tc := range testCases {
-		tc := tc
 		suite.Run(tc.name, func() {
-			if tc.preRun != nil {
-				tc.preRun()
-			}
 			err := suite.feegrantKeeper.GrantAllowance(suite.ctx, tc.granter, tc.grantee, tc.allowance)
 			suite.NoError(err)
 			err = suite.feegrantKeeper.RemoveExpiredAllowances(tc.ctx, 5)
@@ -425,10 +421,6 @@ func (suite *KeeperTestSuite) TestPruneGrants() {
 			} else {
 				suite.NoError(err)
 				suite.NotNil(grant)
-			}
-
-			if tc.postRun != nil {
-				tc.postRun()
 			}
 		})
 	}

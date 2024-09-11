@@ -92,22 +92,25 @@ func (k BaseKeeper) SpendableBalances(ctx context.Context, req *types.QuerySpend
 	}
 
 	zeroAmt := math.ZeroInt()
+	allLocked := k.LockedCoins(ctx, addr)
 
-	balances, pageRes, err := query.CollectionPaginate(ctx, k.Balances, req.Pagination, func(key collections.Pair[sdk.AccAddress, string], _ math.Int) (coin sdk.Coin, err error) {
-		return sdk.NewCoin(key.K2(), zeroAmt), nil
+	balances, pageRes, err := query.CollectionPaginate(ctx, k.Balances, req.Pagination, func(key collections.Pair[sdk.AccAddress, string], balanceAmt math.Int) (sdk.Coin, error) {
+		denom := key.K2()
+		coin := sdk.NewCoin(denom, zeroAmt)
+		lockedAmt := allLocked.AmountOf(denom)
+		switch {
+		case !lockedAmt.IsPositive():
+			coin.Amount = balanceAmt
+		case lockedAmt.LT(balanceAmt):
+			coin.Amount = balanceAmt.Sub(lockedAmt)
+		}
+		return coin, nil
 	}, query.WithCollectionPaginationPairPrefix[sdk.AccAddress, string](addr))
 	if err != nil {
 		return nil, status.Errorf(codes.InvalidArgument, "paginate: %v", err)
 	}
 
-	result := sdk.NewCoins()
-	spendable := k.SpendableCoins(ctx, addr)
-
-	for _, c := range balances {
-		result = append(result, sdk.NewCoin(c.Denom, spendable.AmountOf(c.Denom)))
-	}
-
-	return &types.QuerySpendableBalancesResponse{Balances: result, Pagination: pageRes}, nil
+	return &types.QuerySpendableBalancesResponse{Balances: balances, Pagination: pageRes}, nil
 }
 
 // SpendableBalanceByDenom implements a gRPC query handler for retrieving an account's
@@ -172,7 +175,7 @@ func (k BaseKeeper) DenomsMetadata(c context.Context, req *types.QueryDenomsMeta
 	if req == nil {
 		return nil, status.Errorf(codes.InvalidArgument, "empty request")
 	}
-	kvStore := runtime.KVStoreAdapter(k.storeService.OpenKVStore(c))
+	kvStore := runtime.KVStoreAdapter(k.KVStoreService.OpenKVStore(c))
 	store := prefix.NewStore(kvStore, types.DenomMetadataPrefix)
 
 	metadatas := []types.Metadata{}
@@ -219,18 +222,14 @@ func (k BaseKeeper) DenomMetadataByQueryString(ctx context.Context, req *types.Q
 		return nil, status.Errorf(codes.InvalidArgument, "empty request")
 	}
 
-	if err := sdk.ValidateDenom(req.Denom); err != nil {
-		return nil, status.Error(codes.InvalidArgument, err.Error())
+	res, err := k.DenomMetadata(ctx, &types.QueryDenomMetadataRequest{
+		Denom: req.Denom,
+	})
+	if err != nil {
+		return nil, err
 	}
 
-	metadata, found := k.GetDenomMetaData(ctx, req.Denom)
-	if !found {
-		return nil, status.Errorf(codes.NotFound, "client metadata for denom %s", req.Denom)
-	}
-
-	return &types.QueryDenomMetadataByQueryStringResponse{
-		Metadata: metadata,
-	}, nil
+	return &types.QueryDenomMetadataByQueryStringResponse{Metadata: res.Metadata}, nil
 }
 
 // DenomMetadataV2 is identical to DenomMetadata but receives protoreflect types instead of gogo types.  It exists to
@@ -274,8 +273,9 @@ func (k BaseKeeper) DenomMetadataV2(ctx context.Context, req *v1beta1.QueryDenom
 	}, nil
 }
 
+// DenomOwners returns all the account address that own a requested token denom.
 func (k BaseKeeper) DenomOwners(
-	goCtx context.Context,
+	ctx context.Context,
 	req *types.QueryDenomOwnersRequest,
 ) (*types.QueryDenomOwnersResponse, error) {
 	if req == nil {
@@ -287,15 +287,19 @@ func (k BaseKeeper) DenomOwners(
 	}
 
 	denomOwners, pageRes, err := query.CollectionPaginate(
-		goCtx,
+		ctx,
 		k.Balances.Indexes.Denom,
 		req.Pagination,
 		func(key collections.Pair[string, sdk.AccAddress], value collections.NoValue) (*types.DenomOwner, error) {
-			amt, err := k.Balances.Get(goCtx, collections.Join(key.K2(), req.Denom))
+			amt, err := k.Balances.Get(ctx, collections.Join(key.K2(), req.Denom))
 			if err != nil {
 				return nil, err
 			}
-			return &types.DenomOwner{Address: key.K2().String(), Balance: sdk.NewCoin(req.Denom, amt)}, nil
+			addr, err := k.ak.AddressCodec().BytesToString(key.K2())
+			if err != nil {
+				return nil, err
+			}
+			return &types.DenomOwner{Address: addr, Balance: sdk.NewCoin(req.Denom, amt)}, nil
 		},
 		query.WithCollectionPaginationPairPrefix[string, sdk.AccAddress](req.Denom),
 	)
@@ -333,4 +337,20 @@ func (k BaseKeeper) SendEnabled(ctx context.Context, req *types.QuerySendEnabled
 	}
 
 	return resp, nil
+}
+
+// DenomOwnersByQuery is identical to DenomOwner query, but receives denom values via query string.
+func (k BaseKeeper) DenomOwnersByQuery(ctx context.Context, req *types.QueryDenomOwnersByQueryRequest) (*types.QueryDenomOwnersByQueryResponse, error) {
+	if req == nil {
+		return nil, status.Errorf(codes.InvalidArgument, "empty request")
+	}
+	resp, err := k.DenomOwners(ctx, &types.QueryDenomOwnersRequest{
+		Denom:      req.Denom,
+		Pagination: req.Pagination,
+	})
+	if err != nil {
+		return nil, err
+	}
+
+	return &types.QueryDenomOwnersByQueryResponse{DenomOwners: resp.DenomOwners, Pagination: resp.Pagination}, nil
 }

@@ -16,7 +16,7 @@ import (
 // GetBroadcastCommand returns the tx broadcast command.
 func GetBroadcastCommand() *cobra.Command {
 	cmd := &cobra.Command{
-		Use:   "broadcast [file_path]",
+		Use:   "broadcast <file_path>",
 		Short: "Broadcast transactions generated offline",
 		Long: strings.TrimSpace(`Broadcast transactions created with the --generate-only
 flag and signed with the sign command. Read a transaction from [file_path] and
@@ -34,22 +34,32 @@ filename, the command reads from standard input.`),
 				return errors.New("cannot broadcast tx during offline mode")
 			}
 
-			stdTx, err := authclient.ReadTxFromFile(clientCtx, args[0])
+			txs, err := authclient.ReadTxsFromFile(clientCtx, args[0])
 			if err != nil {
 				return err
 			}
 
-			txBytes, err := clientCtx.TxConfig.TxEncoder()(stdTx)
-			if err != nil {
-				return err
-			}
+			txEncoder := clientCtx.TxConfig.TxEncoder()
+			for _, tx := range txs {
+				txBytes, err1 := txEncoder(tx)
+				if err1 != nil {
+					err = errors.Join(err, err1)
+					continue
+				}
 
-			res, err := clientCtx.BroadcastTx(txBytes)
-			if err != nil {
-				return err
+				res, err2 := clientCtx.BroadcastTx(txBytes)
+				if err2 != nil {
+					err = errors.Join(err, err2)
+					continue
+				}
+				if res != nil {
+					err3 := clientCtx.PrintProto(res)
+					if err3 != nil {
+						err = errors.Join(err, err3)
+					}
+				}
 			}
-
-			return clientCtx.PrintProto(res)
+			return err
 		},
 	}
 

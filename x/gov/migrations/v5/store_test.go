@@ -13,13 +13,14 @@ import (
 	v5 "cosmossdk.io/x/gov/migrations/v5"
 	v1 "cosmossdk.io/x/gov/types/v1"
 
+	codectestutil "github.com/cosmos/cosmos-sdk/codec/testutil"
 	"github.com/cosmos/cosmos-sdk/runtime"
 	"github.com/cosmos/cosmos-sdk/testutil"
 	moduletestutil "github.com/cosmos/cosmos-sdk/types/module/testutil"
 )
 
 func TestMigrateStore(t *testing.T) {
-	cdc := moduletestutil.MakeTestEncodingConfig(gov.AppModuleBasic{}, bank.AppModuleBasic{}).Codec
+	cdc := moduletestutil.MakeTestEncodingConfig(codectestutil.CodecOptions{}, gov.AppModule{}, bank.AppModule{}).Codec
 	govKey := storetypes.NewKVStoreKey("gov")
 	ctx := testutil.DefaultContext(govKey, storetypes.NewTransientStoreKey("transient_test"))
 	store := ctx.KVStore(govKey)
@@ -45,6 +46,7 @@ func TestMigrateStore(t *testing.T) {
 	require.Equal(t, v1.DefaultParams().ExpeditedMinDeposit, params.ExpeditedMinDeposit)
 	require.Equal(t, v1.DefaultParams().ExpeditedThreshold, params.ExpeditedThreshold)
 	require.Equal(t, v1.DefaultParams().ExpeditedVotingPeriod, params.ExpeditedVotingPeriod)
+	require.Equal(t, v1.DefaultParams().MinDepositRatio, params.MinDepositRatio)
 
 	// Check constitution
 	result, err := constitutionCollection.Get(ctx)

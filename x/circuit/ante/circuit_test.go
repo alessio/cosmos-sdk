@@ -11,6 +11,7 @@ import (
 	cbtypes "cosmossdk.io/x/circuit/types"
 
 	"github.com/cosmos/cosmos-sdk/client"
+	codectestutil "github.com/cosmos/cosmos-sdk/codec/testutil"
 	"github.com/cosmos/cosmos-sdk/testutil"
 	"github.com/cosmos/cosmos-sdk/testutil/testdata"
 	sdk "github.com/cosmos/cosmos-sdk/types"
@@ -30,14 +31,14 @@ type MockCircuitBreaker struct {
 	isAllowed bool
 }
 
-func (m MockCircuitBreaker) IsAllowed(ctx context.Context, typeURL string) (bool, error) {
+func (m MockCircuitBreaker) IsAllowed(_ context.Context, typeURL string) (bool, error) {
 	return typeURL == "/cosmos.circuit.v1.MsgAuthorizeCircuitBreaker", nil
 }
 
 func initFixture(t *testing.T) *fixture {
 	t.Helper()
 	mockStoreKey := storetypes.NewKVStoreKey("test")
-	encCfg := moduletestutil.MakeTestEncodingConfig(auth.AppModuleBasic{})
+	encCfg := moduletestutil.MakeTestEncodingConfig(codectestutil.CodecOptions{}, auth.AppModule{})
 	mockclientCtx := client.Context{}.
 		WithTxConfig(encCfg.TxConfig)
 
@@ -61,8 +62,8 @@ func TestCircuitBreakerDecorator(t *testing.T) {
 		allowed bool
 	}{
 		{msg: &cbtypes.MsgAuthorizeCircuitBreaker{
-			Grantee: "cosmos1fghij",
-			Granter: "cosmos1abcde",
+			Grantee: "cosmos139f7kncmglres2nf3h4hc4tade85ekfr8sulz5",
+			Granter: "cosmos16wfryel63g7axeamw68630wglalcnk3l0zuadc",
 		}, allowed: true},
 		{msg: testdata.NewTestMsg(addr1), allowed: false},
 	}

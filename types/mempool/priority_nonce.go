@@ -2,6 +2,7 @@ package mempool
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"math"
 	"sync"
@@ -9,7 +10,6 @@ import (
 	"github.com/huandu/skiplist"
 
 	sdk "github.com/cosmos/cosmos-sdk/types"
-	"github.com/cosmos/cosmos-sdk/x/auth/signing"
 )
 
 var (
@@ -40,6 +40,9 @@ type (
 		//   (sequence number) when evicting transactions.
 		// - if MaxTx < 0, `Insert` is a no-op.
 		MaxTx int
+
+		// SignerExtractor is an implementation which retrieves signer data from a sdk.Tx
+		SignerExtractor SignerExtractionAdapter
 	}
 
 	// PriorityNonceMempool is a mempool implementation that stores txs
@@ -116,7 +119,8 @@ func NewDefaultTxPriority() TxPriority[int64] {
 
 func DefaultPriorityNonceMempoolConfig() PriorityNonceMempoolConfig[int64] {
 	return PriorityNonceMempoolConfig[int64]{
-		TxPriority: NewDefaultTxPriority(),
+		TxPriority:      NewDefaultTxPriority(),
+		SignerExtractor: NewDefaultSignerExtractionAdapter(),
 	}
 }
 
@@ -157,6 +161,9 @@ func skiplistComparable[C comparable](txPriority TxPriority[C]) skiplist.Compara
 // NewPriorityMempool returns the SDK's default mempool implementation which
 // returns txs in a partial order by 2 dimensions; priority, and sender-nonce.
 func NewPriorityMempool[C comparable](cfg PriorityNonceMempoolConfig[C]) *PriorityNonceMempool[C] {
+	if cfg.SignerExtractor == nil {
+		cfg.SignerExtractor = NewDefaultSignerExtractionAdapter()
+	}
 	mp := &PriorityNonceMempool[C]{
 		priorityIndex:  skiplist.New(skiplistComparable(cfg.TxPriority)),
 		priorityCounts: make(map[C]int),
@@ -204,16 +211,16 @@ func (mp *PriorityNonceMempool[C]) Insert(ctx context.Context, tx sdk.Tx) error 
 		return nil
 	}
 
-	sigs, err := tx.(signing.SigVerifiableTx).GetSignaturesV2()
+	sigs, err := mp.cfg.SignerExtractor.GetSigners(tx)
 	if err != nil {
 		return err
 	}
 	if len(sigs) == 0 {
-		return fmt.Errorf("tx must have at least one signer")
+		return errors.New("tx must have at least one signer")
 	}
 
 	sig := sigs[0]
-	sender := sdk.AccAddress(sig.PubKey.Address()).String()
+	sender := sig.Signer.String()
 	priority := mp.cfg.TxPriority.GetTxPriority(ctx, tx)
 	nonce := sig.Sequence
 	key := txMeta[C]{nonce: nonce, priority: priority, sender: sender}
@@ -344,9 +351,13 @@ func (i *PriorityNonceIterator[C]) Tx() sdk.Tx {
 //
 // NOTE: It is not safe to use this iterator while removing transactions from
 // the underlying mempool.
-func (mp *PriorityNonceMempool[C]) Select(_ context.Context, _ [][]byte) Iterator {
+func (mp *PriorityNonceMempool[C]) Select(ctx context.Context, txs [][]byte) Iterator {
 	mp.mtx.Lock()
 	defer mp.mtx.Unlock()
+	return mp.doSelect(ctx, txs)
+}
+
+func (mp *PriorityNonceMempool[C]) doSelect(_ context.Context, _ [][]byte) Iterator {
 	if mp.priorityIndex.Len() == 0 {
 		return nil
 	}
@@ -359,6 +370,17 @@ func (mp *PriorityNonceMempool[C]) Select(_ context.Context, _ [][]byte) Iterato
 	}
 
 	return iterator.iteratePriority()
+}
+
+// SelectBy will hold the mutex during the iteration, callback returns if continue.
+func (mp *PriorityNonceMempool[C]) SelectBy(ctx context.Context, txs [][]byte, callback func(sdk.Tx) bool) {
+	mp.mtx.Lock()
+	defer mp.mtx.Unlock()
+
+	iter := mp.doSelect(ctx, txs)
+	for iter != nil && callback(iter.Tx()) {
+		iter = iter.Next()
+	}
 }
 
 type reorderKey[C comparable] struct {
@@ -425,16 +447,16 @@ func (mp *PriorityNonceMempool[C]) CountTx() int {
 func (mp *PriorityNonceMempool[C]) Remove(tx sdk.Tx) error {
 	mp.mtx.Lock()
 	defer mp.mtx.Unlock()
-	sigs, err := tx.(signing.SigVerifiableTx).GetSignaturesV2()
+	sigs, err := mp.cfg.SignerExtractor.GetSigners(tx)
 	if err != nil {
 		return err
 	}
 	if len(sigs) == 0 {
-		return fmt.Errorf("attempted to remove a tx with no signatures")
+		return errors.New("attempted to remove a tx with no signatures")
 	}
 
 	sig := sigs[0]
-	sender := sdk.AccAddress(sig.PubKey.Address()).String()
+	sender := sig.Signer.String()
 	nonce := sig.Sequence
 
 	scoreKey := txMeta[C]{nonce: nonce, sender: sender}
@@ -460,7 +482,7 @@ func (mp *PriorityNonceMempool[C]) Remove(tx sdk.Tx) error {
 func IsEmpty[C comparable](mempool Mempool) error {
 	mp := mempool.(*PriorityNonceMempool[C])
 	if mp.priorityIndex.Len() != 0 {
-		return fmt.Errorf("priorityIndex not empty")
+		return errors.New("priorityIndex not empty")
 	}
 
 	countKeys := make([]C, 0, len(mp.priorityCounts))

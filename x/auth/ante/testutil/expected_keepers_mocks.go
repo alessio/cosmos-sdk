@@ -9,6 +9,7 @@ import (
 	reflect "reflect"
 
 	address "cosmossdk.io/core/address"
+	appmodule "cosmossdk.io/core/appmodule"
 	types "github.com/cosmos/cosmos-sdk/types"
 	types0 "github.com/cosmos/cosmos-sdk/x/auth/types"
 	gomock "github.com/golang/mock/gomock"
@@ -65,6 +66,20 @@ func (mr *MockAccountKeeperMockRecorder) GetAccount(ctx, addr interface{}) *gomo
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetAccount", reflect.TypeOf((*MockAccountKeeper)(nil).GetAccount), ctx, addr)
 }
 
+// GetEnvironment mocks base method.
+func (m *MockAccountKeeper) GetEnvironment() appmodule.Environment {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "GetEnvironment")
+	ret0, _ := ret[0].(appmodule.Environment)
+	return ret0
+}
+
+// GetEnvironment indicates an expected call of GetEnvironment.
+func (mr *MockAccountKeeperMockRecorder) GetEnvironment() *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetEnvironment", reflect.TypeOf((*MockAccountKeeper)(nil).GetEnvironment))
+}
+
 // GetModuleAddress mocks base method.
 func (m *MockAccountKeeper) GetModuleAddress(moduleName string) types.AccAddress {
 	m.ctrl.T.Helper()
@@ -91,6 +106,20 @@ func (m *MockAccountKeeper) GetParams(ctx context.Context) types0.Params {
 func (mr *MockAccountKeeperMockRecorder) GetParams(ctx interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetParams", reflect.TypeOf((*MockAccountKeeper)(nil).GetParams), ctx)
+}
+
+// NewAccountWithAddress mocks base method.
+func (m *MockAccountKeeper) NewAccountWithAddress(ctx context.Context, addr types.AccAddress) types.AccountI {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "NewAccountWithAddress", ctx, addr)
+	ret0, _ := ret[0].(types.AccountI)
+	return ret0
+}
+
+// NewAccountWithAddress indicates an expected call of NewAccountWithAddress.
+func (mr *MockAccountKeeperMockRecorder) NewAccountWithAddress(ctx, addr interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "NewAccountWithAddress", reflect.TypeOf((*MockAccountKeeper)(nil).NewAccountWithAddress), ctx, addr)
 }
 
 // SetAccount mocks base method.
@@ -140,4 +169,43 @@ func (m *MockFeegrantKeeper) UseGrantedFees(ctx context.Context, granter, grante
 func (mr *MockFeegrantKeeperMockRecorder) UseGrantedFees(ctx, granter, grantee, fee, msgs interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "UseGrantedFees", reflect.TypeOf((*MockFeegrantKeeper)(nil).UseGrantedFees), ctx, granter, grantee, fee, msgs)
+}
+
+// MockConsensusKeeper is a mock of ConsensusKeeper interface.
+type MockConsensusKeeper struct {
+	ctrl     *gomock.Controller
+	recorder *MockConsensusKeeperMockRecorder
+}
+
+// MockConsensusKeeperMockRecorder is the mock recorder for MockConsensusKeeper.
+type MockConsensusKeeperMockRecorder struct {
+	mock *MockConsensusKeeper
+}
+
+// NewMockConsensusKeeper creates a new mock instance.
+func NewMockConsensusKeeper(ctrl *gomock.Controller) *MockConsensusKeeper {
+	mock := &MockConsensusKeeper{ctrl: ctrl}
+	mock.recorder = &MockConsensusKeeperMockRecorder{mock}
+	return mock
+}
+
+// EXPECT returns an object that allows the caller to indicate expected use.
+func (m *MockConsensusKeeper) EXPECT() *MockConsensusKeeperMockRecorder {
+	return m.recorder
+}
+
+// BlockParams mocks base method.
+func (m *MockConsensusKeeper) BlockParams(arg0 context.Context) (uint64, uint64, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "BlockParams", arg0)
+	ret0, _ := ret[0].(uint64)
+	ret1, _ := ret[1].(uint64)
+	ret2, _ := ret[2].(error)
+	return ret0, ret1, ret2
+}
+
+// BlockParams indicates an expected call of BlockParams.
+func (mr *MockConsensusKeeperMockRecorder) BlockParams(arg0 interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "BlockParams", reflect.TypeOf((*MockConsensusKeeper)(nil).BlockParams), arg0)
 }

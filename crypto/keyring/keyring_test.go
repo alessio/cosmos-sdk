@@ -17,6 +17,7 @@ import (
 	"golang.org/x/crypto/bcrypt"
 
 	"github.com/cosmos/cosmos-sdk/codec"
+	codectestutil "github.com/cosmos/cosmos-sdk/codec/testutil"
 	codectypes "github.com/cosmos/cosmos-sdk/codec/types"
 	"github.com/cosmos/cosmos-sdk/crypto"
 	cryptocodec "github.com/cosmos/cosmos-sdk/crypto/codec"
@@ -223,7 +224,7 @@ func TestNewKey(t *testing.T) {
 			_, err = kb.KeyByAddress(addr)
 			require.NoError(t, err)
 
-			addr, err = sdk.AccAddressFromBech32("cosmos1yq8lgssgxlx9smjhes6ryjasmqmd3ts2559g0t")
+			addr, err = codectestutil.CodecOptions{}.GetAddressCodec().StringToBytes("cosmos1yq8lgssgxlx9smjhes6ryjasmqmd3ts2559g0t")
 			require.NoError(t, err)
 			_, err = kb.KeyByAddress(addr)
 			require.NotNil(t, err)
@@ -1119,7 +1120,7 @@ func TestNewAccount(t *testing.T) {
 			bip39Passphrease: "",
 			algo:             hd.Secp256k1,
 			mnemonic:         "fresh enact fresh ski large bicycle marine abandon motor end pact mixture annual elite bind fan write warrior adapt common manual cool happy dutch",
-			expectedErr:      fmt.Errorf("Invalid byte at position"),
+			expectedErr:      errors.New("invalid byte at position"),
 		},
 		{
 			name:             "in memory invalid mnemonic",
@@ -1129,7 +1130,7 @@ func TestNewAccount(t *testing.T) {
 			bip39Passphrease: "",
 			algo:             hd.Secp256k1,
 			mnemonic:         "malarkey pair crucial catch public canyon evil outer stage ten gym tornado",
-			expectedErr:      fmt.Errorf("Invalid mnemonic"),
+			expectedErr:      errors.New("invalid mnemonic"),
 		},
 	}
 	for _, tt := range tests {
@@ -1972,14 +1973,14 @@ func TestRenameKey(t *testing.T) {
 			},
 		},
 		{
-			name: "cant rename a key that doesnt exist",
+			name: "can't rename a key that doesn't exist",
 			run: func(kr Keyring) {
 				err := kr.Rename("bogus", "bogus2")
 				require.Error(t, err)
 			},
 		},
 		{
-			name: "cant rename a key to an already existing key name",
+			name: "can't rename a key to an already existing key name",
 			run: func(kr Keyring) {
 				key1, key2 := "existingKey", "existingKey2" // create 2 keys
 				newKeyRecord(t, kr, key1)
@@ -1990,7 +1991,7 @@ func TestRenameKey(t *testing.T) {
 			},
 		},
 		{
-			name: "cant rename key to itself",
+			name: "can't rename key to itself",
 			run: func(kr Keyring) {
 				keyName := "keyName"
 				newKeyRecord(t, kr, keyName)

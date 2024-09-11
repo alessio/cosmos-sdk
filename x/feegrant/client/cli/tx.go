@@ -1,6 +1,7 @@
 package cli
 
 import (
+	"errors"
 	"fmt"
 	"strings"
 	"time"
@@ -47,7 +48,7 @@ func GetTxCmd() *cobra.Command {
 // This command is more powerful than AutoCLI generated command as it allows a better input validation.
 func NewCmdFeeGrant() *cobra.Command {
 	cmd := &cobra.Command{
-		Use:     "grant [granter_key_or_address] [grantee]",
+		Use:     "grant <granter_key_or_address> <grantee>",
 		Aliases: []string{"grant-allowance"},
 		Short:   "Grant Fee allowance to an address",
 		Long: strings.TrimSpace(
@@ -136,11 +137,11 @@ Examples:
 				}
 
 				if periodClock <= 0 {
-					return fmt.Errorf("period clock was not set")
+					return errors.New("period clock was not set")
 				}
 
 				if periodLimit == nil {
-					return fmt.Errorf("period limit was not set")
+					return errors.New("period limit was not set")
 				}
 
 				periodReset := getPeriodReset(periodClock)
@@ -151,7 +152,6 @@ Examples:
 				periodic := feegrant.PeriodicAllowance{
 					Basic:            basic,
 					Period:           getPeriod(periodClock),
-					PeriodReset:      getPeriodReset(periodClock),
 					PeriodSpendLimit: periodLimit,
 					PeriodCanSpend:   periodLimit,
 				}

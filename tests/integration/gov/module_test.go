@@ -7,6 +7,7 @@ import (
 
 	"cosmossdk.io/depinject"
 	"cosmossdk.io/log"
+	_ "cosmossdk.io/x/accounts"
 	"cosmossdk.io/x/gov/types"
 	_ "cosmossdk.io/x/mint"
 	_ "cosmossdk.io/x/protocolpool"
@@ -22,6 +23,7 @@ func TestItCreatesModuleAccountOnInitBlock(t *testing.T) {
 	app, err := simtestutil.SetupAtGenesis(
 		depinject.Configs(
 			configurator.NewAppConfig(
+				configurator.AccountsModule(),
 				configurator.AuthModule(),
 				configurator.StakingModule(),
 				configurator.BankModule(),

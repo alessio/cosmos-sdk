@@ -7,7 +7,6 @@ import (
 
 	"cosmossdk.io/depinject"
 	"cosmossdk.io/log"
-	"cosmossdk.io/x/distribution/testutil"
 	"cosmossdk.io/x/distribution/types"
 
 	simtestutil "github.com/cosmos/cosmos-sdk/testutil/sims"
@@ -20,7 +19,7 @@ func TestItCreatesModuleAccountOnInitBlock(t *testing.T) {
 
 	app, err := simtestutil.SetupAtGenesis(
 		depinject.Configs(
-			testutil.AppConfig,
+			AppConfig,
 			depinject.Supply(log.NewNopLogger()),
 		),
 		&accountKeeper)
