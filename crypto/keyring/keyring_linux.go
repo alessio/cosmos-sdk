@@ -13,7 +13,7 @@ import (
 
 const BackendKeyctl = "keyctl"
 
-func newKeyctlBackendConfig(appName, _ string, inpt io.Reader) keyring.Config {
+func newKeyctlBackendConfig(appName, _ string, _ io.Reader) keyring.Config {
 	return keyring.Config{
 		AllowedBackends: []keyring.BackendType{keyring.KeyCtlBackend},
 		ServiceName:     appName,
