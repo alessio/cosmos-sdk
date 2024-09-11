@@ -4,6 +4,7 @@
 package keyring
 
 import (
+	"fmt"
 	"io"
 
 	"github.com/99designs/keyring"
@@ -34,7 +35,7 @@ func New(
 
 	db, err := keyring.Open(newKeyctlBackendConfig(appName, "", userInput))
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("couldn't open keyring for %q: %w", appName, err)
 	}
 
 	return newKeystore(db, cdc, backend, opts...), nil
